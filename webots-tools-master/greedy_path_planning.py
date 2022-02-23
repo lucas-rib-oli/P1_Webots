@@ -221,11 +221,15 @@ def dumpPathImage (charMap, nodes, goalParentId, vwriter, args):
         cv2.rectangle ( gridMapImage, tl_point, br_point, (0, 0, 0), thickness = 2 )
    
     gridMapImage_resized = cv2.resize (gridMapImage, (400, 500))
+    path2save = os.path.join ( os.getcwd(), 'images/' + args.algorithm + '_path_planning.png' )
+    print ('path2save: ', path2save)
     cv2.imshow('Grid Map Image', gridMapImage_resized)
-    cv2.waitKey(0)
+    cv2.imwrite ( path2save, gridMapImage_resized )
+    
     if(args.video):
         vwriter.write (gridMapImage_resized)
     print (bcolors.BOLDBLUE + "Pulsa una tecla para terminar (con la imagen clickeada)" + bcolors.RESET)
+    cv2.waitKey(0)
 
 # Breadth First Search Algorithm
 def breadthFS (charMap, args, vwriter):

@@ -248,8 +248,56 @@ int main(int argc, char **argv)
 	double left_speed = 0.0;
 	double right_speed = 0.0;
 
+	std::vector < std::vector<double> > coords;
+	if (method == "breadth" || method == "depth" || method == "best" || method == "a_star")
+	{
+		point = 1; // Para no coger el punto de inicio
+
+		// --------------------- read points for map --------------------- //
+		std::string path_2_points ( argv [2] ); // Ruta hacia los txt donde se almacenan los puntos resultantes de los algoritmos de path planning
+		std::ifstream file_points ( path_2_points + method + "_points.txt" );
+		std::cout << argv[0] << std::endl;
+		std::string line;
+		std::vector < std::vector<double> > coords;
+		if ( file_points.is_open() )
+		{
+			while (std::getline (file_points, line))
+			{
+				int start = 0;
+				int end = line.find(" ");
+				line.substr (0, end - start);
+				std::string space_delimiter = " ";
+
+				size_t pos = 0;
+				std::vector <double> coord;
+				while ((pos = line.find(space_delimiter)) != std::string::npos) 
+				{
+					coord.push_back( std::stold( line.substr(0, pos) ) + 0.5 );
+					line.erase(0, pos + space_delimiter.length());
+				}
+				coord.push_back ( std::stold( line ) + 0.5 );
+				coords.push_back ( coord );
+			}
+			// Se invierte el vector
+			std::vector<double> aux; 
+			for (size_t i = 0; i < coords.size()/2; i++)
+			{
+				aux = coords[i]; 
+				coords[i] = coords[coords.size()-1 -i];
+				coords[coords.size()-1 -i] = aux;
+			}
+		}
+		else
+		{
+			std::cout << "No se ha podido abrir el archivo: " << path_2_points + method + "_points.txt | se ejecutara el modo por defecto" << std::endl;
+			method = "default";
+		}
+	}
+
 	if ( method == "sensors" )
 	{
+		destination_position[0] = std::stod ( std::string ( argv[3] ) );
+		destination_position[1] = std::stod ( std::string ( argv[4] ) );
 		while (robot->step(timeStep) != -1)
 		{
 			for ( size_t i = 0; i < 8; i++)
@@ -280,28 +328,28 @@ int main(int argc, char **argv)
 			}
 			else if ( ds_values[0] > DISTANCE_LIMIT + 60 || ds_values[1] > DISTANCE_LIMIT + 60 ) // Obstaculo delante/derecha
 			{
-				std::cout << "Obstaculo delante dcha" << std::endl;
+				std::cout << "Obstaculo delante a la derecha" << std::endl;
 				// set robot motor to rotate left
 				left_speed = -MAX_SPEED * 0.30;
 				right_speed = MAX_SPEED * 0.30;
 			}
 			else if ( ds_values[2] > DISTANCE_LIMIT ) // Obstaculo derecha
 			{
-				std::cout << "Obstaculo dcha" << std::endl;
+				std::cout << "Obstaculo a la derecha" << std::endl;
 				// set robot motor to rotate left
 				left_speed = MAX_SPEED * 0.30;
 				right_speed = MAX_SPEED * 0.30;
 			}
 			else if ( ds_values[7] > DISTANCE_LIMIT + 60 || ds_values[6] > DISTANCE_LIMIT + 60 ) // Obstaculo delante/izquierda
 			{
-				std::cout << "Obstaculo delante izda" << std::endl;
+				std::cout << "Obstaculo delante a la izquierda" << std::endl;
 				// set robot motor to rotate left
 				left_speed = MAX_SPEED * 0.30;
 				right_speed = -MAX_SPEED * 0.30;
 			}
 			else if ( ds_values[5] > DISTANCE_LIMIT ) // Obstaculo derecha
 			{
-				std::cout << "Obstaculo izda" << std::endl;
+				std::cout << "Obstaculo a la izquierda" << std::endl;
 				// set robot motor to rotate left
 				left_speed = MAX_SPEED * 0.30;
 				right_speed = MAX_SPEED * 0.30;
@@ -339,9 +387,7 @@ int main(int argc, char **argv)
 		// --------------------- read points for map --------------------- //
 		std::string path_2_points ( argv [2] ); // Ruta hacia los txt donde se almacenan los puntos resultantes de los algoritmos de path planning
 		std::ifstream file_points ( path_2_points + method + "_points.txt" );
-		std::cout << argv[0] << std::endl;
 		std::string line;
-		std::vector < std::vector<double> > coords;
 		if ( file_points.is_open() )
 		{
 			while (std::getline (file_points, line))
@@ -527,7 +573,6 @@ int main(int argc, char **argv)
 			default:
 				motor_left->setVelocity(0.0);
 				motor_right->setVelocity(0.0);
-				exit (0);
 				break;
 			}
 
@@ -619,14 +664,13 @@ int main(int argc, char **argv)
 
 		};
 	}
+	std::cout << "Se ha llegado al punto objetivo !!" << std::endl;
 	while (robot->step(timeStep) != -1)
 	{
 		for ( size_t i = 0; i < 10; i++)
 		{
 			leds[i]->set ( 250 );
 		}
-
-		std::cout << "Se ha llegado al punto objetivo !!" << "\r" << std::flush;
 	}
 
 	
