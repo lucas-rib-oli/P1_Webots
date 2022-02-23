@@ -4,7 +4,7 @@ WorldInfo {
 }
 Viewpoint {
   orientation 1 0 0 4.71238898038469
-  position 5.26670284938246 19.0241984090156 4.979482540198289
+  position 3.1330187010291954 9.454237928761234 2.3691242735958906
 }
 TexturedBackground {
 }
@@ -444,8 +444,9 @@ E-puck {
   rotation 0 1 0 3.14159
   controller "my_controller_cpp"
   controllerArgs [
-    "a_star"
-    "/home/lsi/UC3M/Simuladores_de_Robots/P1_Webots/webots-tools-master/"
+    "sensors"
+    "3.5"
+    "12.5"
   ]
   turretSlot [
     DistanceSensor {

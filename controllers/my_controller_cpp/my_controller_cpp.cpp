@@ -32,6 +32,8 @@
 #include <fstream>
 #include <limits>
 #include <math.h>
+#include <stdio.h>
+#include <unistd.h>
 
 // Definition of the dimensions of the robot (https://cyberbotics.com/doc/guide/epuck)
 #define WHEEL_RADIUS 0.0205 // [m]
@@ -48,40 +50,46 @@ using namespace webots;
 // ================= Statement of functions =================
 
 /**
- * @brief Calculate the angle between two points
+ * @brief Calculo del angulo entre dos puntos
  * 
- * @param current_position Current position of the robot
- * @param destination_position Destination position
- * @return Angle between two points
+ * @param current_position Posicion actual del robot
+ * @param destination_position Punto de destino
+ * @return Angulo entre dos puntos
  */
 double calcDestHeading ( double current_position[2], double destination_position[2] )
 {
 	double delta_x = destination_position[0] - current_position[0];
 	double delta_z = destination_position[1] - current_position[1];
+
 	double angle = 0.0;
-	angle = std::fabs ( std::atan2 ( delta_z, delta_x ) ) * 180 / M_PI;
+	// angle = std::fabs ( std::atan2 ( delta_z, delta_x ) ) * 180 / M_PI;
+	angle = std::fabs ( std::atan ( delta_z / delta_x ) ) * 180 / M_PI;
 	double norm_angle = 0.0;
 	if ( delta_x >= 0 && delta_z >= 0 ) // I Quadrant
 	{
 		norm_angle =  90 - angle;
-	} else if ( delta_x >= 0 && delta_z <= 0 ) // II Quadrant
+	} else if ( delta_x > 0 && delta_z < 0 ) // II Quadrant
 	{
 		norm_angle = 90 + angle;
-	} else if ( delta_x >= 0 && delta_z <= 0 ) // III Quadrant
+	} else if ( delta_x > 0 && delta_z < 0 ) // III Quadrant
 	{
 		norm_angle = 270 - angle;
 	} else // IV Quadrant
 	{
 		norm_angle = 270 + angle;
 	}
-	norm_angle = std::remainder ( norm_angle, 360 );
+	// norm_angle = std::remainder ( norm_angle, 360 );
+	if ( norm_angle >= 360 )
+	{
+		norm_angle = norm_angle - 360;
+	}
 	return norm_angle;
 }
 
 /**
- * @brief 
+ * @brief Normalización del heading
  * 
- * @return double 
+ * @return double Angulo a normalizar
  */
 double normHeading ( double heading )
 {
@@ -94,9 +102,9 @@ double normHeading ( double heading )
 }
 
 /**
- * @brief 
+ * @brief Calculo de la velocidad tangencial del robot
  * 
- * @param angular_wheel_speed 
+ * @param angular_wheel_speed Velocidad de giro del robot
  * @return double 
  */
 double calcTangentialVelocity ( double angular_wheel_speed )
@@ -105,9 +113,9 @@ double calcTangentialVelocity ( double angular_wheel_speed )
 }
 
 /**
- * @brief 
+ * @brief Calculo de la velocidad angular del robot
  * 
- * @param tangential_speed 
+ * @param tangential_speed Velocidad tangencial del robot
  * @return double 
  */
 double calcAngularVelocity ( double tangential_speed )
@@ -116,10 +124,10 @@ double calcAngularVelocity ( double tangential_speed )
 }
 
 /**
- * @brief 
+ * @brief Calculo de la distancia euclidea entre dos puntos
  * 
- * @param current_position 
- * @param destination_position 
+ * @param current_position Actual posicion del robot
+ * @param destination_position Punto objetivo
  * @return double 
  */
 double calcEuclideanDistance ( double current_position[2], double destination_position[2] )
@@ -127,52 +135,6 @@ double calcEuclideanDistance ( double current_position[2], double destination_po
 	return std::sqrt ( std::pow ( destination_position[0] - current_position[0], 2 ) + std::pow ( destination_position[1] - current_position[1], 2 ) );
 }
 
-void getPercentageOfColourImage ( Camera* camera )
-{
-	// get current image from forward camera
-	const unsigned char* image = camera->getImage();
-
-	int image_width = camera->getWidth();
-    int image_height = camera->getHeight();
-	int sumLeftGreen = 0;
-	int sumRightGreen = 0;
-	int sumLeftWhite = 0;
-	int sumRightWhite = 0;
-	double greenLeft = 0, redLeft = 0, blueLeft = 0;
-	double greenRight = 0, redRight = 0, blueRight = 0;
-	double percentage_greenLeft = 0.0;
-	double percentage_greenRight = 0.0;
-	double percentage_whiteLeft = 0.0;
-	double percentage_whiteRight = 0.0;
-	// count number of pixels that are white
-	// (here assumed to have pixel value > 245 out of 255 for all color components)
-	for (int x = 0; x < image_width / 2; x++) {
-		for (int y = image_height / 2; y < image_height; y++) {
-			greenLeft = camera->imageGetGreen(image, image_width, x, y);
-			redLeft = camera->imageGetRed(image, image_width, x, y);
-			blueLeft = camera->imageGetBlue(image, image_width, x, y);
-
-			if ((greenLeft > 85) && (redLeft > 85) && (blueLeft > 85)) {
-				sumLeftWhite += 1;
-			}
-		}
-
-	}
-	for (int x = image_width / 2; x < image_width; x++) {
-		for (int y = image_height / 2; y < image_height; y++) {
-			greenRight = camera->imageGetGreen(image, image_width, x, y);
-			redRight = camera->imageGetRed(image, image_width, x, y);
-			blueRight = camera->imageGetBlue(image, image_width, x, y);
-
-			if ((greenRight > 85) && (redRight > 85) && (blueRight > 85)) {
-				sumRightWhite += 1;
-			}
-		}
-
-	}
-	percentage_whiteLeft = (sumLeftWhite / (float)(image_width * image_height)) * 400; // Multiplicamos por 200 por que cogemos la mitad de la imgagen
-	percentage_whiteRight = (sumRightWhite / (float)(image_width * image_height)) * 400;
-}
 
 // This is the main program of your controller.
 // It creates an instance of your Robot instance, launches its
@@ -208,6 +170,7 @@ int main(int argc, char **argv)
 	{
 		std::string name_led = "led" + std::to_string ( i );
 		leds[i] = robot->getLED ( name_led );
+
 	}
  
 	GPS* gps = robot->getGPS("gps");
@@ -228,7 +191,6 @@ int main(int argc, char **argv)
 	bool get_heading = true;
 	bool get_distance = true;
 	double start_time;
-	bool correct_heading = false;
 	int point = 0;
 
 	double t_heading = 0;
@@ -241,24 +203,24 @@ int main(int argc, char **argv)
 	double destination_position [2] = { 12.5, 14.5 };
 
 	double ds_values [8] = {0.0};
-
-	bool avoid_obstacles = false;
-	bool use_path_planning = true;
-
+	
 	double left_speed = 0.0;
 	double right_speed = 0.0;
 
 	std::vector < std::vector<double> > coords;
 	if (method == "breadth" || method == "depth" || method == "best" || method == "a_star")
 	{
-		point = 1; // Para no coger el punto de inicio
-
 		// --------------------- read points for map --------------------- //
-		std::string path_2_points ( argv [2] ); // Ruta hacia los txt donde se almacenan los puntos resultantes de los algoritmos de path planning
-		std::ifstream file_points ( path_2_points + method + "_points.txt" );
-		std::cout << argv[0] << std::endl;
 		std::string line;
-		std::vector < std::vector<double> > coords;
+		char s[100];
+		// recursividad de carpetas 
+		chdir("..");
+		chdir("..");
+		std::string path_2_points ( getcwd (s, 100) );
+		path_2_points += "/webots-tools-master/"; // concatenar ruta
+		// Ruta hacia los txt donde se almacenan los puntos resultantes de los algoritmos de path planning
+		std::ifstream file_points ( path_2_points + method + "_points.txt" );
+		
 		if ( file_points.is_open() )
 		{
 			while (std::getline (file_points, line))
@@ -272,7 +234,7 @@ int main(int argc, char **argv)
 				std::vector <double> coord;
 				while ((pos = line.find(space_delimiter)) != std::string::npos) 
 				{
-					coord.push_back( std::stold( line.substr(0, pos) ) + 0.5 );
+					coord.push_back( std::stold( line.substr(0, pos) ) + 0.5 ); // Se guardan los puntos del fichero
 					line.erase(0, pos + space_delimiter.length());
 				}
 				coord.push_back ( std::stold( line ) + 0.5 );
@@ -296,10 +258,11 @@ int main(int argc, char **argv)
 
 	if ( method == "sensors" )
 	{
-		destination_position[0] = std::stod ( std::string ( argv[3] ) );
-		destination_position[1] = std::stod ( std::string ( argv[4] ) );
+		destination_position[0] = std::stod ( std::string ( argv[2] ) );
+		destination_position[1] = std::stod ( std::string ( argv[3] ) );
 		while (robot->step(timeStep) != -1)
 		{
+			
 			for ( size_t i = 0; i < 8; i++)
 			{
 				ds_values[i] = ds[i]->getValue();
@@ -311,14 +274,14 @@ int main(int argc, char **argv)
 			current_position [0] = pos [0]; // X
 			current_position [1] = pos [2]; // Z
 
-			destination_heading = calcDestHeading ( current_position, destination_position );
-			current_heading = normHeading ( imu_rads[2] * 180.0 / M_PI );
-			delta_theta = std::fabs (destination_heading - current_heading);
+			destination_heading = calcDestHeading ( current_position, destination_position ); // Calcular el heading de destion
+			current_heading = normHeading ( imu_rads[2] * 180.0 / M_PI ); // Normalizar el heading actual
+			delta_theta = std::fabs (destination_heading - current_heading); // Calcular la diferencia de angulos
 			delta_theta = delta_theta > 180 ? 360-delta_theta : delta_theta;
 			comparation_angle = destination_heading < 180 ? destination_heading + 180.0 : destination_heading - 180.0;
-			double distance_to_destination = calcEuclideanDistance ( current_position, destination_position );
-			
-			if ( distance_to_destination < 0.1 )
+			double distance_to_destination = calcEuclideanDistance ( current_position, destination_position ); // Obtener la distancia al punto objetvo
+
+			if ( distance_to_destination < 0.1 ) //  Se llega al destino
 			{
 				left_speed = 0.0;
 				right_speed = 0.0;
@@ -328,48 +291,53 @@ int main(int argc, char **argv)
 			}
 			else if ( ds_values[0] > DISTANCE_LIMIT + 60 || ds_values[1] > DISTANCE_LIMIT + 60 ) // Obstaculo delante/derecha
 			{
-				std::cout << "Obstaculo delante a la derecha" << std::endl;
-				// set robot motor to rotate left
-				left_speed = -MAX_SPEED * 0.30;
-				right_speed = MAX_SPEED * 0.30;
+				left_speed = -MAX_SPEED * 0.20;
+				right_speed = MAX_SPEED * 0.20;
 			}
 			else if ( ds_values[2] > DISTANCE_LIMIT ) // Obstaculo derecha
 			{
-				std::cout << "Obstaculo a la derecha" << std::endl;
-				// set robot motor to rotate left
 				left_speed = MAX_SPEED * 0.30;
 				right_speed = MAX_SPEED * 0.30;
 			}
 			else if ( ds_values[7] > DISTANCE_LIMIT + 60 || ds_values[6] > DISTANCE_LIMIT + 60 ) // Obstaculo delante/izquierda
 			{
-				std::cout << "Obstaculo delante a la izquierda" << std::endl;
-				// set robot motor to rotate left
-				left_speed = MAX_SPEED * 0.30;
-				right_speed = -MAX_SPEED * 0.30;
+				left_speed = MAX_SPEED * 0.20;
+				right_speed = -MAX_SPEED * 0.20;
 			}
 			else if ( ds_values[5] > DISTANCE_LIMIT ) // Obstaculo derecha
 			{
-				std::cout << "Obstaculo a la izquierda" << std::endl;
-				// set robot motor to rotate left
 				left_speed = MAX_SPEED * 0.30;
 				right_speed = MAX_SPEED * 0.30;
 			}
-			else if (std::fabs (delta_theta) > 2.0 )
+			else if (std::fabs (delta_theta) > 2.0 && ds_values[0] < DISTANCE_LIMIT + 20 && ds_values[1] < DISTANCE_LIMIT + 20 && ds_values[2] < DISTANCE_LIMIT + 20
+			&& ds_values[3] < DISTANCE_LIMIT + 20 && ds_values[4] < DISTANCE_LIMIT + 20 && ds_values[5] < DISTANCE_LIMIT + 20 && ds_values[6] < DISTANCE_LIMIT + 20 && ds_values[7] < DISTANCE_LIMIT + 20)
 			{
-				std::cout << "Go to heading" << std::endl;
-				if ( current_heading > comparation_angle || current_heading < destination_heading )
+				if ( destination_heading < 180 )
 				{
-					// set robot motor to rotate left
-					left_speed = -MAX_SPEED * 0.30;
-					right_speed = MAX_SPEED * 0.30;
-				}
-				// if thetaDot < 0, robot will rotate to right
-				else 
+					if ( current_heading > destination_heading && current_heading < comparation_angle )
+					{
+						left_speed = MAX_SPEED * 0.20;
+						right_speed = -MAX_SPEED * 0.20;
+					}
+					else 
+					{
+						left_speed = -MAX_SPEED * 0.20;
+						right_speed = MAX_SPEED * 0.20;
+					}
+				} else
 				{
-					// set robot motor to rotate right
-					left_speed = MAX_SPEED * 0.30;
-					right_speed = -MAX_SPEED * 0.30;
+					if ( current_heading > comparation_angle && current_heading < destination_heading )
+					{
+						left_speed = -MAX_SPEED * 0.20;
+						right_speed = MAX_SPEED * 0.20;
+					}
+					else 
+					{
+						left_speed = MAX_SPEED * 0.20;
+						right_speed = -MAX_SPEED * 0.20;
+					}
 				}
+				
 			}
 			else
 			{
@@ -382,53 +350,14 @@ int main(int argc, char **argv)
 	}
 	else if (method == "breadth" || method == "depth" || method == "best" || method == "a_star")
 	{
-		point = 1;; // Para no coger el punto de inicio
-
-		// --------------------- read points for map --------------------- //
-		std::string path_2_points ( argv [2] ); // Ruta hacia los txt donde se almacenan los puntos resultantes de los algoritmos de path planning
-		std::ifstream file_points ( path_2_points + method + "_points.txt" );
-		std::string line;
-		if ( file_points.is_open() )
-		{
-			while (std::getline (file_points, line))
-			{
-				int start = 0;
-				int end = line.find(" ");
-				line.substr (0, end - start);
-				std::string space_delimiter = " ";
-
-				size_t pos = 0;
-				std::vector <double> coord;
-				while ((pos = line.find(space_delimiter)) != std::string::npos) 
-				{
-					coord.push_back( std::stold( line.substr(0, pos) ) + 0.5 );
-					line.erase(0, pos + space_delimiter.length());
-				}
-				coord.push_back ( std::stold( line ) + 0.5 );
-				coords.push_back ( coord );
-			}
-			// Se invierte el vector
-			std::vector<double> aux; 
-			for (size_t i = 0; i < coords.size()/2; i++)
-			{
-				aux = coords[i]; 
-				coords[i] = coords[coords.size()-1 -i];
-				coords[coords.size()-1 -i] = aux;
-			}
-		}
+		point = 1; // Para no coger el punto de inicio
 		while (robot->step(timeStep) != -1) 
 		{
-			// Read the sensors:
-			// Enter here functions to read sensor data, like:
-			for ( size_t i = 0; i < 8; i++)
-			{
-				double val = ds[i]->getValue();
-			}
 			
+			// Leemos sensores
 			const double * pos = gps->getValues();
 			const double * imu_rads = imu->getRollPitchYaw();
 
-			// Process sensor data here.
 			double current_position [2];
 			current_position [0] = pos [0]; // X
 			current_position [1] = pos [2]; // Z
@@ -440,57 +369,65 @@ int main(int argc, char **argv)
 
 			destination_position[0] = coords[point][1];
 			destination_position[1] = coords[point][0];
-			if ( calcEuclideanDistance ( current_position, destination_position ) < 0.05 )
+			if ( calcEuclideanDistance ( current_position, destination_position ) < 0.02 )
 			{
 				point++;
 			}
 			else if ( get_heading )
 			{
-				double tangential_speed = calcTangentialVelocity ( ANGULAR_WHEEL_SPEED_ROTATE );
+				double tangential_speed = calcTangentialVelocity ( ANGULAR_WHEEL_SPEED_ROTATE ); // Calculo de la velocidad tangencial
 				start_time = robot->getTime ();
 				get_heading = false;
-				destination_heading = calcDestHeading ( current_position, destination_position );
+				destination_heading = calcDestHeading ( current_position, destination_position ); // Calculo del heading de destino
 				
-				current_heading = normHeading ( imu_rads[2] * 180.0 / M_PI );
+				current_heading = normHeading ( imu_rads[2] * 180.0 / M_PI ); // Normalizacion
 				delta_theta = std::fabs (destination_heading - current_heading);
 				delta_theta = delta_theta > 180 ? 360-delta_theta : delta_theta;
 
-				double angular_speed = calcAngularVelocity ( tangential_speed ) * 180 / M_PI;
-				t_heading = std::abs(delta_theta) / angular_speed;
+				double angular_speed = calcAngularVelocity ( tangential_speed ) * 180 / M_PI; // Calculo de velocidad angular
+				t_heading = std::abs(delta_theta) / angular_speed; // Tiempo en alcanzar el heading de destino
 
-				comparation_angle = destination_heading < 180 ? destination_heading + 180.0 : destination_heading - 180.0;
+				comparation_angle = destination_heading < 180 ? destination_heading + 180.0 : destination_heading - 180.0; // Angulo suplementario
 			}
 			
 			if ( robot->getTime () < start_time + t_heading )
 			{
-				if ( current_heading > comparation_angle || current_heading < destination_heading )
+				
+				if ( destination_heading < 180 )
 				{
-					// set robot motor to rotate left
-					motor_left->setVelocity(-ANGULAR_WHEEL_SPEED_ROTATE);
-					motor_right->setVelocity(ANGULAR_WHEEL_SPEED_ROTATE);
-				}
-				// if thetaDot < 0, robot will rotate to right
-				else
+					if ( current_heading > destination_heading && current_heading < comparation_angle )
+					{
+						left_speed = ANGULAR_WHEEL_SPEED_ROTATE;
+						right_speed = -ANGULAR_WHEEL_SPEED_ROTATE;
+					}
+					else 
+					{
+						left_speed = -ANGULAR_WHEEL_SPEED_ROTATE;
+						right_speed = ANGULAR_WHEEL_SPEED_ROTATE;
+					}
+				} else
 				{
-					// set robot motor to rotate right
-					motor_left->setVelocity(ANGULAR_WHEEL_SPEED_ROTATE);
-					motor_right->setVelocity(-ANGULAR_WHEEL_SPEED_ROTATE);
+					if ( current_heading > comparation_angle && current_heading < destination_heading )
+					{
+						left_speed = -ANGULAR_WHEEL_SPEED_ROTATE;
+						right_speed = ANGULAR_WHEEL_SPEED_ROTATE;
+					}
+					else 
+					{
+						left_speed = ANGULAR_WHEEL_SPEED_ROTATE;
+						right_speed = -ANGULAR_WHEEL_SPEED_ROTATE;
+					}
 				}
 			} 
 			else
 			{
-				motor_left->setVelocity(0.0);
-				motor_right->setVelocity(0.0);
-				correct_heading = true;
-				// get_distance = true;
-
 				if ( get_distance )
 				{
-					double tangential_speed = calcTangentialVelocity ( MAX_SPEED );
+					double tangential_speed = calcTangentialVelocity ( MAX_SPEED ); // Calculo de la velocidad tangencial
 					start_time = robot->getTime ();
 					get_distance = false;
 					double distance_to_destination = calcEuclideanDistance ( current_position, destination_position );
-					t_distance = distance_to_destination / tangential_speed;
+					t_distance = distance_to_destination / tangential_speed; // Tiempo en recorrer la distancia hacia el punto objetivo
 				}
 				// Corregir el heading si es necesario por la inercia del robot
 				current_heading = normHeading ( imu_rads[2] * 180.0 / M_PI );
@@ -500,49 +437,57 @@ int main(int argc, char **argv)
 				
 				if (std::fabs (delta_theta) > 2.0 )
 				{
-					if ( current_heading > comparation_angle || current_heading < destination_heading )
+					if ( destination_heading < 180 )
 					{
-						// set robot motor to rotate left
-						motor_left->setVelocity(-2.0); // Velocidades bajas para evitar el exceso de giro
-						motor_right->setVelocity(2.0);
-					}
-					// if thetaDot < 0, robot will rotate to right
-					else 
+						if ( current_heading > destination_heading && current_heading < comparation_angle )
+						{
+							left_speed = MAX_SPEED * 0.20;
+							right_speed = -MAX_SPEED * 0.20;
+						}
+						else 
+						{
+							left_speed = -MAX_SPEED * 0.20;
+							right_speed = MAX_SPEED * 0.20;
+						}
+					} else
 					{
-						// set robot motor to rotate right
-						motor_left->setVelocity(2.0);
-						motor_right->setVelocity(-2.0);
+						if ( current_heading > comparation_angle && current_heading < destination_heading )
+						{
+							left_speed = -MAX_SPEED * 0.20;
+							right_speed = MAX_SPEED * 0.20;
+						}
+						else 
+						{
+							left_speed = MAX_SPEED * 0.20;
+							right_speed = -MAX_SPEED * 0.20;
+						}
 					}
+					
 				}
 				else if ( robot->getTime () < start_time + t_distance )
 				{
-					motor_left->setVelocity(6.0);
-					motor_right->setVelocity(6.0);
+					left_speed = MAX_SPEED;
+					right_speed = MAX_SPEED;
 				} 
 				else
 				{
-					motor_left->setVelocity(0.0);
-					motor_right->setVelocity(0.0);
+					left_speed = 0.0;
+					right_speed = 0.0;
 					get_distance = true;
 					get_heading = true;
-					correct_heading = false;
 					point++;
 				}
 			}
-
+			motor_left->setVelocity(left_speed);
+			motor_right->setVelocity(right_speed);
 		};
 	}
 	else 
 	{
 		while (robot->step(timeStep) != -1) 
 		{
-			// Read the sensors:
-			// Enter here functions to read sensor data, like:
-			for ( size_t i = 0; i < 8; i++)
-			{
-				double val = ds[i]->getValue();
-			}
 			
+			// Leemos sensores
 			const double * pos = gps->getValues();
 			const double * imu_rads = imu->getRollPitchYaw();
 
@@ -611,11 +556,6 @@ int main(int argc, char **argv)
 			} 
 			else
 			{
-				motor_left->setVelocity(0.0);
-				motor_right->setVelocity(0.0);
-				correct_heading = true;
-				// get_distance = true;
-
 				if ( get_distance )
 				{
 					double tangential_speed = calcTangentialVelocity ( MAX_SPEED );
@@ -657,7 +597,6 @@ int main(int argc, char **argv)
 					motor_right->setVelocity(0.0);
 					get_distance = true;
 					get_heading = true;
-					correct_heading = false;
 					point++;
 				}
 			}
@@ -669,11 +608,11 @@ int main(int argc, char **argv)
 	{
 		for ( size_t i = 0; i < 10; i++)
 		{
-			leds[i]->set ( 250 );
+			// Activamos LEDs
+			leds[i]->set ( 32 );
 		}
+		break;
 	}
-
-	
 
 	// Enter here exit cleanup code.
 	std::cout << "Bye from c++!" << std::endl;
